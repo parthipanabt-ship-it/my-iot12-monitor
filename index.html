@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vibration Sentry</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: white; text-align: center; margin: 0; padding: 20px; cursor: pointer; }
+        #sentry-status { color: #555; font-size: 0.9em; margin-bottom: 30px; }
+        .active-ai { color: #00ffcc !important; text-shadow: 0 0 10px #00ffcc; }
+        
+        #vibe-alert { 
+            display: none; background: #ff0000; color: white; padding: 30px; 
+            font-size: 2em; font-weight: bold; border: 5px solid white;
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; border-radius: 20px; z-index: 9999;
+            animation: flash 0.5s infinite;
+        }
+        @keyframes flash { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
+
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .box { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        .num { font-size: 2em; color: #00d4ff; font-weight: bold; display: block; }
+        .unit { color: #888; font-size: 0.8em; }
+    </style>
+</head>
+<body onclick="activateAI()">
+
+    <div id="vibe-alert">⚠️ AI WARNING: VIBRATION DETECTED ⚠️</div>
+
+    <h1>AI IoT Sentry</h1>
+    <p id="sentry-status">AI Status: [CLICK ANYWHERE TO ACTIVATE ASSISTANT]</p>
+
+    <div class="dashboard">
+        <div class="card box">Temp<span class="num" id="T">--</span><span class="unit">°C</span></div>
+        <div class="card box">Humid<span class="num" id="H">--</span><span class="unit">%</span></div>
+        <div class="card box">Volt<span class="num" id="V">--</span><span class="unit">V</span></div>
+        <div class="card box">Amps<span class="num" id="A">--</span><span class="unit">A</span></div>
+        <div class="card box">Count<span class="num" id="Cnt">0</span><span class="unit">Objects</span></div>
+    </div>
+
+    <script>
+        const TOPIC_PREFIX = "my_iot_project_77";
+        let aiReady = false;
+
+        // 1. Initialize MQTT
+        const client = new Paho.MQTT.Client("broker.hivemq.com", 8884, "sentry_" + Math.random());
+
+        // 2. Activate Voice AI on User Interaction
+        function activateAI() {
+            if (!aiReady) {
+                aiReady = true;
+                const msg = new SpeechSynthesisUtterance("AI Voice Assistant Activated. System is now under monitoring.");
+                window.speechSynthesis.speak(msg);
+                document.getElementById('sentry-status').innerText = "AI Status: ACTIVE & MONITORING";
+                document.getElementById('sentry-status').classList.add('active-ai');
+            }
+        }
+
+        // 3. Trigger AI Voice Alert
+        function speakAlert() {
+            if (!aiReady) return; // Wait for user to click first
+
+            const alertDiv = document.getElementById('vibe-alert');
+            alertDiv.style.display = 'block';
+
+            const voiceAlert = new SpeechSynthesisUtterance("Emergency. Vibration detected. System integrity at risk.");
+            voiceAlert.rate = 0.85; 
+            voiceAlert.pitch = 1.1;
+            window.speechSynthesis.speak(voiceAlert);
+
+            setTimeout(() => { alertDiv.style.display = 'none'; }, 5000);
+        }
+
+        // 4. Handle Incoming Data
+        client.onMessageArrived = (message) => {
+            console.log(message.payloadString);
+            if (message.destinationName.includes("vibration")) {
+                speakAlert();
+            } else {
+                // Parse "Cnt:1,V:5.0..."
+                const data = message.payloadString.split(',');
+                data.forEach(item => {
+                    const [key, val] = item.split(':');
+                    const el = document.getElementById(key);
+                    if (el) el.innerText = val;
+                });
+            }
+        };
+
+        client.connect({
+            useSSL: true,
+            onSuccess: () => {
+                client.subscribe(TOPIC_PREFIX + "/#");
+                console.log("Sentry Connected to Cloud");
+            }
+        });
+    </script>
+</body>
+</html>
